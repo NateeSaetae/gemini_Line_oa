@@ -1,51 +1,31 @@
-require('dotenv').config(); // Load variables from .env file
+// index.js
+
+require('dotenv').config();
 
 const express = require('express');
 const { Client, middleware } = require('@line/bot-sdk');
-const { GoogleGenAI } = require('@google/genai');
+const { GoogleGenAI } = require('@google/genai'); 
 
-// --- Configuration and Initialization ---
-
-// LINE Messaging API Configuration
-const lineConfig = {
-    // These keys are loaded from the .env file using process.env
-    channelAccessToken: process.env.LINE_TOKEN,
-    channelSecret: process.env.LINE_CHANEL_SECRET,
+// --- 1. ตั้งค่า LINE Client ---
+const config = {
+    channelAccessToken: process.env.LINE_CHANNEL_TOKEN,
+    channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
+const lineClient = new Client(config);
 
-// Initialize LINE Client
-const lineClient = new Client(lineConfig);
-
-// Initialize Gemini AI Client
+// --- 2. ตั้งค่า Gemini AI Client ---
 const geminiAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
-const GEMINI_MODEL = 'gemini-2.5-flash'; // A fast and capable model for chat
+const GEMINI_MODEL = 'gemini-2.5-flash'; 
 
-// Initialize Express App
-const app = express();
-
-// --- Main Webhook Handler ---
-
-// LINE Middleware is used to validate the request signature
-// It also places the parsed body into req.body
-app.use(middleware(lineConfig));
-
-// Webhook endpoint: This is the URL LINE will POST to (e.g., https://yourdomain.com/webhook)
-app.post('/webhook', (req, res) => {
-    // req.body.events is an array of events (messages, follow events, etc.)
-    const events = req.body.events;
-
-    // Process all events concurrently and send the response back
-    Promise.all(events.map(handleEvent))
-        .then((result) => res.json(result))
-        .catch((err) => {
-            console.error('Webhook processing error:', err);
-            res.status(500).end();
-        });
-});
-
-// --- Event Handling Logic ---
-
-// index.js (เพิ่มส่วนนี้ก่อนฟังก์ชัน handleEvent)
+// System Instruction สำหรับจำกัดขอบเขตความรู้ (Scope Limitation)
+const SYSTEM_INSTRUCTION = `
+    คุณคือผู้ช่วย Chatbot สำหรับบริษัทประกันภัยเท่านั้น หน้าที่ของคุณคือตอบคำถามเกี่ยวกับผลิตภัณฑ์ประกันภัย, การเคลม, และบริการหลังการขาย
+    
+    คำสั่งสำคัญ:
+    1. ห้ามตอบคำถามที่ไม่เกี่ยวข้องกับประกันภัย, การเงิน, หรือบริการของบริษัทประกัน (เช่น ชีวะ, เคมี, ประวัติศาสตร์, สูตรอาหาร, การเมือง, ข่าวทั่วไป).
+    2. หากได้รับคำถามที่ไม่เกี่ยวข้อง ให้ตอบอย่างสุภาพว่า "ขออภัยค่ะ/ครับ ดิฉันเป็น Chatbot ผู้เชี่ยวชาญด้านประกันภัยเท่านั้น ไม่สามารถตอบคำถามในหัวข้อนี้ได้ค่ะ/ครับ".
+    3. ตอบกลับด้วยภาษาไทยเท่านั้น.
+`;
 
 // --- Utility Functions for LINE Rich UI ---
 
@@ -53,7 +33,6 @@ app.post('/webhook', (req, res) => {
 function getQuickReplyItems() {
     return {
         items: [
-            // ใช้ type: 'message' เพื่อให้ผู้ใช้พิมพ์ข้อความเข้า Flow โดยอัตโนมัติ
             { type: 'action', action: { type: 'message', label: '📞 แจ้งเคลมด่วน', text: 'แจ้งเคลม' } },
             { type: 'action', action: { type: 'message', label: '✅ ดูแพ็กเกจ', text: 'ดูแพ็กเกจ' } },
             { type: 'action', action: { type: 'message', label: '📍 หาศูนย์ซ่อม', text: 'ศูนย์ซ่อม' } },
@@ -84,14 +63,6 @@ function getPackageFlexMessage() {
                                 { type: 'text', text: '✅', color: '#1DB446', size: 'sm', flex: 1 },
                                 { type: 'text', text: 'ซ่อมศูนย์ในเครือทั้งหมด', color: '#666666', size: 'sm', flex: 5 }
                             ] },
-                            { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
-                                { type: 'text', text: '✅', color: '#1DB446', size: 'sm', flex: 1 },
-                                { type: 'text', text: 'ชดเชยค่าเดินทางระหว่างซ่อม', color: '#666666', size: 'sm', flex: 5 }
-                            ] },
-                            { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
-                                { type: 'text', text: '✅', color: '#1DB446', size: 'sm', flex: 1 },
-                                { type: 'text', text: 'ไม่มีค่า Excess (กรณีที่ถูกต้อง)', color: '#666666', size: 'sm', flex: 5 }
-                            ] }
                         ]
                     },
                     { type: 'separator', margin: 'xxl' },
@@ -119,48 +90,64 @@ function getPackageFlexMessage() {
     };
 }
 
+// --- ฟังก์ชัน 3: เรียก Gemini AI พร้อมจำกัดขอบเขต ---
+async function getGeminiResponse(userMessage) {
+    try {
+        const response = await geminiAI.models.generateContent({
+            model: GEMINI_MODEL,
+            // 1. ใส่ System Instruction เพื่อจำกัดขอบเขตความรู้
+            config: {
+                systemInstruction: SYSTEM_INSTRUCTION,
+            },
+            contents: [{ role: "user", parts: [{ text: userMessage }] }],
+        });
+
+        const geminiResponseText = response.text;
+        console.log(`[GEMINI] Response: ${geminiResponseText.substring(0, 100)}...`);
+        return geminiResponseText;
+
+    } catch (error) {
+        console.error('❌ Error calling Gemini AI:', error);
+        return 'ขออภัยค่ะ เกิดข้อผิดพลาดในการเชื่อมต่อกับระบบ AI กรุณาลองใหม่อีกครั้งค่ะ';
+    }
+}
+
+// --- 4. Webhook Handler (รวม Logic Flow และ Keyword Matching) ---
 async function handleEvent(event) {
     if (event.type !== 'message' || event.message.type !== 'text') {
         return Promise.resolve(null);
     }
-
+    
+    const userId = event.source.userId;
     const userMessage = event.message.text.trim();
     let replyMessages = [];
 
-    console.log(`Received message from user: ${userMessage}`);
+    console.log(`[USER: ${userId}] Received message: ${userMessage}`);
 
-    // --- A. การจัดการคำสำคัญ (Keyword Matching) ---
+    // --- A. การจัดการคำสำคัญ (Keyword Matching & Flow) ---
 
-    // 1. ตรวจสอบ 'ดูแพ็กเกจ' (ตอบกลับด้วย Flex Message)
+    // 1. ตรวจสอบ 'ดูแพ็กเกจ/ราคา' (ตอบกลับด้วย Flex Message)
     if (userMessage.includes('แพ็กเกจ') || userMessage.includes('ราคา') || userMessage.includes('ประกัน')) {
         const welcomeMessage = { type: 'text', text: 'นี่คือแพ็กเกจประกันยอดนิยมของเราค่ะ/ครับ:' };
         const flexMessage = getPackageFlexMessage();
         
         replyMessages.push(welcomeMessage, flexMessage);
-        
-        // เพิ่ม Quick Reply เพื่อนำทางต่อ
-        replyMessages.push({ 
-            type: 'text', 
-            text: 'สนใจข้อมูลอื่นๆ เพิ่มเติมไหมคะ/ครับ?', 
-            quickReply: getQuickReplyItems() 
-        });
-
+        replyMessages.push({ type: 'text', text: 'สนใจข้อมูลอื่นๆ เพิ่มเติมไหมคะ/ครับ?', quickReply: getQuickReplyItems() });
     } 
     // 2. ตรวจสอบ 'แจ้งเคลม' (เริ่ม Claim Flow ด้วย Quick Reply)
     else if (userMessage.includes('เคลม') || userMessage.includes('รถชน') || userMessage.includes('แจ้งเหตุ')) {
          replyMessages.push({
             type: 'text',
-            text: 'รับทราบค่ะ สำหรับการแจ้งเคลมด่วน กรุณาเลือกประเภทอุบัติเหตุที่เกิดขึ้น หรือระบุทะเบียนรถเลยค่ะ:',
+            text: 'รับทราบค่ะ ต้องการ *เริ่ม* แจ้งเคลมเลยใช่ไหมคะ? หรือมีคำถามเกี่ยวกับขั้นตอนคะ? (ถ้าต้องการถาม ให้พิมพ์ข้อความคำถามมาเลย)',
             quickReply: {
                  items: [
-                    { type: 'action', action: { type: 'message', label: '🚗 ชนคู่กรณี', text: 'เริ่มเคลม: ชนคู่กรณี' } },
-                    { type: 'action', action: { type: 'message', label: '🌳 ชนวัตถุ/ไม่มีคู่กรณี', text: 'เริ่มเคลม: ชนวัตถุ' } },
+                    { type: 'action', action: { type: 'message', label: '🚗 เริ่มแจ้งเคลมตอนนี้', text: 'เริ่มเคลม' } }, 
                     { type: 'action', action: { type: 'message', label: '❌ ยกเลิก/คุยกับคน', text: 'คุยกับเจ้าหน้าที่' } },
                 ]
             }
         });
     }
-    // 3. ตรวจสอบ 'สวัสดี' (ตอบกลับด้วย Quick Reply)
+    // 3. ตรวจสอบ 'สวัสดี'
     else if (userMessage.toLowerCase().includes('สวัสดี') || userMessage.toLowerCase().includes('hi') || userMessage.toLowerCase() === 'หวัดดี') {
         replyMessages.push({
             type: 'text',
@@ -170,63 +157,27 @@ async function handleEvent(event) {
     }
     // --- B. ส่งไปให้ Gemini AI (Fallback) ---
     else {
-        // หากไม่เข้าเงื่อนไข Keyword พิเศษใดๆ ให้ส่งข้อความไปให้ Gemini ตอบ
-        const systemInstruction = `
-            คุณคือผู้ช่วย Chatbot สำหรับบริษัทประกันภัยชั้นนำเท่านั้น หน้าที่ของคุณคือตอบคำถามเกี่ยวกับผลิตภัณฑ์ประกันภัย, การเคลม, และบริการหลังการขาย
-            
-            คำสั่งสำคัญ:
-            1. ห้ามตอบคำถามที่ไม่เกี่ยวข้องกับประกันภัย, การเงิน, หรือบริการของบริษัทประกัน (เช่น ชีวะ, เคมี, ประวัติศาสตร์, สูตรอาหาร, การเมือง, ข่าวทั่วไป).
-            2. หากได้รับคำถามที่ไม่เกี่ยวข้อง ให้ตอบอย่างสุภาพว่า "ขออภัยค่ะ/ครับ ดิฉันเป็น Chatbot ผู้เชี่ยวชาญด้านประกันภัยเท่านั้น ไม่สามารถตอบคำถามในหัวข้อนี้ได้ค่ะ/ครับ"
-            3. หากจำเป็นต้องใช้ข้อมูลเฉพาะของบริษัท ให้ระบุชื่อบริษัท/ผลิตภัณฑ์ที่คุณถูกฝึกฝนมา (ถ้ามี).
-            4. ตอบกลับด้วยภาษาไทยเท่านั้น
-        `;
-        try {
-            const response = await geminiAI.models.generateContent({
-                model: GEMINI_MODEL,
-                config: {
-                    systemInstruction: systemInstruction,
-                },
-                contents: [{ role: "user", parts: [{ text: userMessage }] }],
-            });
-
-            const geminiResponseText = response.text;
-            console.log(`Gemini response: ${geminiResponseText}`);
-
-            // ตอบกลับด้วยข้อความจาก Gemini และแนบ Quick Reply
-            replyMessages.push({
-                type: 'text',
-                text: geminiResponseText,
-                quickReply: getQuickReplyItems()
-            });
-
-        } catch (error) {
-            console.error('Error calling Gemini API:', error);
-            // Fallback Error Message
-            replyMessages.push({
-                type: 'text',
-                text: 'I apologize, I encountered an internal error with the AI. Please try asking me again.',
-            });
-        }
+        // หากไม่เข้าเงื่อนไข Flow ใดๆ ให้ส่งไปให้ Gemini ตอบ (โดยมี System Instruction คุมขอบเขต)
+        const geminiResponseText = await getGeminiResponse(userMessage);
+        
+        replyMessages.push({
+            type: 'text',
+            text: geminiResponseText,
+            quickReply: getQuickReplyItems()
+        });
     }
 
-    // 4. ตอบกลับไปยัง LINE
-    // ใช้ lineClient.replyMessage โดยส่ง Array ของข้อความกลับไปได้เลย
-    // **หมายเหตุ:** ต้องตรวจสอบว่า replyMessages มีข้อความอยู่ก่อนส่ง
+    // 4. ตอบกลับไปยัง LINE และตรวจสอบ Error
     if (replyMessages.length > 0) {
         try {
             return lineClient.replyMessage(event.replyToken, replyMessages);
         } catch (lineError) {
-            // **ส่วนที่เพิ่มเข้ามา: ตรวจสอบ Error จาก LINE API**
+            // **Log สำหรับตรวจสอบ Token Error**
             if (lineError.statusCode === 401 || lineError.statusCode === 403) {
                 console.error('❌ LINE API TOKEN ERROR: Channel Access Token อาจหมดอายุหรือไม่ถูกต้อง');
-                console.error('   LINE API Response Status:', lineError.statusCode);
                 console.error('   LINE API Message:', lineError.message);
-                
-                // ไม่ต้องส่งข้อความกลับไปหา User เพราะ Token มีปัญหา
                 return Promise.resolve(null); 
             }
-            
-            // Log Error อื่นๆ ที่ไม่ใช่ Token
             console.error('❌ Error replying to LINE:', lineError);
             return Promise.resolve(null);
         }
@@ -235,11 +186,21 @@ async function handleEvent(event) {
     return Promise.resolve(null);
 }
 
-// --- Server Start Up ---
 
+// --- 5. ตั้งค่า Express Server ---
+const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.post('/webhook', middleware(config), (req, res) => {
+    Promise
+        .all(req.body.events.map(handleEvent))
+        .then((result) => res.json(result))
+        .catch((err) => {
+            console.error(err);
+            res.status(500).end();
+        });
+});
+
 app.listen(PORT, () => {
-    console.log(`🚀 Server running and listening on port ${PORT}`);
-    console.log(`Set your LINE webhook URL to: http://<your-host-url>:${PORT}/webhook`);
+    console.log(`🚀 Server running at http://localhost:${PORT}/webhook`);
 });
