@@ -1,5 +1,3 @@
-// index.js
-
 require('dotenv').config(); // Load variables from .env file
 
 const express = require('express');
@@ -173,9 +171,21 @@ async function handleEvent(event) {
     // --- B. ส่งไปให้ Gemini AI (Fallback) ---
     else {
         // หากไม่เข้าเงื่อนไข Keyword พิเศษใดๆ ให้ส่งข้อความไปให้ Gemini ตอบ
+        const systemInstruction = `
+            คุณคือผู้ช่วย Chatbot สำหรับบริษัทประกันภัยชั้นนำเท่านั้น หน้าที่ของคุณคือตอบคำถามเกี่ยวกับผลิตภัณฑ์ประกันภัย, การเคลม, และบริการหลังการขาย
+            
+            คำสั่งสำคัญ:
+            1. ห้ามตอบคำถามที่ไม่เกี่ยวข้องกับประกันภัย, การเงิน, หรือบริการของบริษัทประกัน (เช่น ชีวะ, เคมี, ประวัติศาสตร์, สูตรอาหาร, การเมือง, ข่าวทั่วไป).
+            2. หากได้รับคำถามที่ไม่เกี่ยวข้อง ให้ตอบอย่างสุภาพว่า "ขออภัยค่ะ/ครับ ดิฉันเป็น Chatbot ผู้เชี่ยวชาญด้านประกันภัยเท่านั้น ไม่สามารถตอบคำถามในหัวข้อนี้ได้ค่ะ/ครับ"
+            3. หากจำเป็นต้องใช้ข้อมูลเฉพาะของบริษัท ให้ระบุชื่อบริษัท/ผลิตภัณฑ์ที่คุณถูกฝึกฝนมา (ถ้ามี).
+            4. ตอบกลับด้วยภาษาไทยเท่านั้น
+        `;
         try {
             const response = await geminiAI.models.generateContent({
                 model: GEMINI_MODEL,
+                config: {
+                    systemInstruction: systemInstruction,
+                },
                 contents: [{ role: "user", parts: [{ text: userMessage }] }],
             });
 
