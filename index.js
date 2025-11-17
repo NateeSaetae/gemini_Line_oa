@@ -203,7 +203,23 @@ async function handleEvent(event) {
     // ใช้ lineClient.replyMessage โดยส่ง Array ของข้อความกลับไปได้เลย
     // **หมายเหตุ:** ต้องตรวจสอบว่า replyMessages มีข้อความอยู่ก่อนส่ง
     if (replyMessages.length > 0) {
-        return lineClient.replyMessage(event.replyToken, replyMessages);
+        try {
+            return lineClient.replyMessage(event.replyToken, replyMessages);
+        } catch (lineError) {
+            // **ส่วนที่เพิ่มเข้ามา: ตรวจสอบ Error จาก LINE API**
+            if (lineError.statusCode === 401 || lineError.statusCode === 403) {
+                console.error('❌ LINE API TOKEN ERROR: Channel Access Token อาจหมดอายุหรือไม่ถูกต้อง');
+                console.error('   LINE API Response Status:', lineError.statusCode);
+                console.error('   LINE API Message:', lineError.message);
+                
+                // ไม่ต้องส่งข้อความกลับไปหา User เพราะ Token มีปัญหา
+                return Promise.resolve(null); 
+            }
+            
+            // Log Error อื่นๆ ที่ไม่ใช่ Token
+            console.error('❌ Error replying to LINE:', lineError);
+            return Promise.resolve(null);
+        }
     }
     
     return Promise.resolve(null);
