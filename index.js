@@ -1,4 +1,4 @@
-require('dotenv').config(); // Load variables from .env file
+require('dotenv').config();
 
 const express = require('express');
 const { Client, middleware } = require('@line/bot-sdk');
@@ -23,18 +23,11 @@ const GEMINI_MODEL = 'gemini-2.5-flash'; // A fast and capable model for chat
 // Initialize Express App
 const app = express();
 
-// --- Main Webhook Handler ---
-
-// LINE Middleware is used to validate the request signature
-// It also places the parsed body into req.body
 app.use(middleware(lineConfig));
 
-// Webhook endpoint: This is the URL LINE will POST to (e.g., https://yourdomain.com/webhook)
 app.post('/webhook', (req, res) => {
-    // req.body.events is an array of events (messages, follow events, etc.)
     const events = req.body.events;
 
-    // Process all events concurrently and send the response back
     Promise.all(events.map(handleEvent))
         .then((result) => res.json(result))
         .catch((err) => {
@@ -43,13 +36,6 @@ app.post('/webhook', (req, res) => {
         });
 });
 
-// --- Event Handling Logic ---
-
-// index.js (เพิ่มส่วนนี้ก่อนฟังก์ชัน handleEvent)
-
-// --- Utility Functions for LINE Rich UI ---
-
-// ฟังก์ชันสำหรับสร้าง Quick Reply Items สำหรับการนำทางหลัก
 function getQuickReplyItems() {
     return {
         items: [
