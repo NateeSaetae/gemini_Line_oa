@@ -47,60 +47,103 @@ function getQuickReplyItems() {
     };
 }
 
+function createInsuranceBubble(title, summary, price, primaryActionText, secondaryActionText, primaryActionData) {
+    return {
+        type: 'bubble',
+        size: 'kilo', // หรือ 'mega' ถ้าต้องการขนาดใหญ่ขึ้น
+        body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+                { type: 'text', text: title, weight: 'bold', color: '#00B900', size: 'md' },
+                { type: 'text', text: summary, weight: 'bold', size: 'xl', margin: 'md' },
+                // ... (ส่วนรายละเอียดคุณสมบัติ)
+                {
+                    type: 'box',
+                    layout: 'vertical',
+                    margin: 'lg',
+                    spacing: 'sm',
+                    contents: [
+                        { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
+                            { type: 'text', text: '✅', color: '#1DB446', size: 'sm', flex: 1 },
+                            { type: 'text', text: 'ซ่อมศูนย์/ซ่อมดีอู่มาตรฐาน', color: '#666666', size: 'sm', flex: 5 }
+                        ] },
+                        { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
+                            { type: 'text', text: '✅', color: '#1DB446', size: 'sm', flex: 1 },
+                            { type: 'text', text: 'คุ้มครองรถหาย/ไฟไหม้', color: '#666666', size: 'sm', flex: 5 }
+                        ] },
+                    ]
+                },
+                { type: 'separator', margin: 'xxl' },
+                {
+                    type: 'box',
+                    layout: 'horizontal',
+                    margin: 'md',
+                    contents: [
+                        { type: 'text', text: 'ราคาเริ่มต้น:', size: 'sm', color: '#AAAAAA', flex: 2 },
+                        { type: 'text', text: price, size: 'sm', color: '#000000', align: 'end', flex: 3, weight: 'bold' }
+                    ]
+                }
+            ],
+        },
+        footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+                // Primary Action (ขอใบเสนอราคา)
+                { type: 'button', style: 'primary', height: 'sm', action: { type: 'message', label: primaryActionText, text: primaryActionData } },
+                // Secondary Action (รายละเอียดเพิ่มเติม)
+                { type: 'button', style: 'secondary', height: 'sm', action: { type: 'message', label: secondaryActionText, text: 'รายละเอียด ' + title } } 
+            ]
+        }
+    };
+}
+
 // ฟังก์ชันสำหรับสร้าง Flex Message (ตัวอย่าง รายละเอียดแพ็กเกจประกัน)
 function getPackageFlexMessage() {
+    // 1. สร้าง Bubble สำหรับแพ็กเกจที่ 1 (ชั้น 1)
+    const package1Bubble = createInsuranceBubble(
+        'ชั้น 1 (A+)', 
+        'คุ้มครองครบวงจร ซ่อมศูนย์', 
+        '14,999 บาท/ปี', 
+        'ขอใบเสนอราคา (ชั้น 1)', 
+        'รายละเอียดเพิ่มเติม',
+        'ต้องการใบเสนอราคาสำหรับประกันชั้น 1'
+    );
+    
+    // 2. สร้าง Bubble สำหรับแพ็กเกจที่ 2 (ชั้น 2+)
+    const package2Bubble = createInsuranceBubble(
+        'ชั้น 2+ คุ้มค่า', 
+        'คุ้มครองรถชน/รถหาย/ไฟไหม้', 
+        '8,500 บาท/ปี', 
+        'ขอใบเสนอราคา (2+)', 
+        'รายละเอียดเพิ่มเติม',
+        'ต้องการใบเสนอราคาสำหรับประกันชั้น 2+'
+    );
+
+    // 3. สร้าง Bubble สำหรับแพ็กเกจที่ 3 (ชั้น 3)
+    const package3Bubble = createInsuranceBubble(
+        'ชั้น 3 ประหยัด', 
+        'คุ้มครองคู่กรณี (เน้นความรับผิด)', 
+        '2,500 บาท/ปี', 
+        'ขอใบเสนอราคา (ชั้น 3)', 
+        'รายละเอียดเพิ่มเติม',
+        'ต้องการใบเสนอราคาสำหรับประกันชั้น 3'
+    );
+
+    // 4. รวม Bubbles ทั้งหมดในโครงสร้าง Carousel
     return {
         type: 'flex',
-        altText: 'รายละเอียดแพ็กเกจประกันยอดนิยม',
+        altText: 'แพ็กเกจประกันยอดนิยมหลายตัวเลือก',
         contents: {
-            type: 'bubble',
-            body: {
-                type: 'box',
-                layout: 'vertical',
-                contents: [
-                    { type: 'text', text: '✨ แพ็กเกจประกันชั้น 1 (A+)', weight: 'bold', color: '#00B900', size: 'sm' },
-                    { type: 'text', text: 'คุ้มครองครบวงจร', weight: 'bold', size: 'xl', margin: 'md' },
-                    {
-                        type: 'box',
-                        layout: 'vertical',
-                        margin: 'lg',
-                        spacing: 'sm',
-                        contents: [
-                            { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
-                                { type: 'text', text: '✅', color: '#1DB446', size: 'sm', flex: 1 },
-                                { type: 'text', text: 'ซ่อมศูนย์ในเครือทั้งหมด', color: '#666666', size: 'sm', flex: 5 }
-                            ] },
-                            { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
-                                { type: 'text', text: '✅', color: '#1DB446', size: 'sm', flex: 1 },
-                                { type: 'text', text: 'ชดเชยค่าเดินทางระหว่างซ่อม', color: '#666666', size: 'sm', flex: 5 }
-                            ] },
-                            { type: 'box', layout: 'baseline', spacing: 'sm', contents: [
-                                { type: 'text', text: '✅', color: '#1DB446', size: 'sm', flex: 1 },
-                                { type: 'text', text: 'ไม่มีค่า Excess (กรณีที่ถูกต้อง)', color: '#666666', size: 'sm', flex: 5 }
-                            ] }
-                        ]
-                    },
-                    { type: 'separator', margin: 'xxl' },
-                    {
-                        type: 'box',
-                        layout: 'horizontal',
-                        margin: 'md',
-                        contents: [
-                            { type: 'text', text: 'ราคาเริ่มต้น:', size: 'sm', color: '#AAAAAA', flex: 2 },
-                            { type: 'text', text: '14,999 บาท/ปี', size: 'sm', color: '#000000', align: 'end', flex: 3, weight: 'bold' }
-                        ]
-                    }
-                ],
-            },
-            footer: {
-                type: 'box',
-                layout: 'vertical',
-                spacing: 'sm',
-                contents: [
-                    { type: 'button', style: 'primary', height: 'sm', action: { type: 'message', label: 'ขอใบเสนอราคา', text: 'ต้องการใบเสนอราคาสำหรับประกันชั้น 1' } },
-                    { type: 'button', style: 'secondary', height: 'sm', action: { type: 'uri', label: 'โทรหาเจ้าหน้าที่ (24 ชม.)', uri: 'tel:021234567' } }
-                ]
-            }
+            type: 'carousel', // เปลี่ยนจาก 'bubble' เป็น 'carousel'
+            contents: [
+                package1Bubble,
+                package2Bubble,
+                package3Bubble,
+                // คุณสามารถเพิ่ม Bubble อื่นๆ ได้ที่นี่
+            ]
         }
     };
 }
