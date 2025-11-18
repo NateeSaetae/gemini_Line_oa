@@ -50,7 +50,7 @@ function getQuickReplyItems() {
 function createInsuranceBubble(title, summary, price, primaryActionText, secondaryActionText, primaryActionData) {
     return {
         type: 'bubble',
-        size: 'kilo', // หรือ 'mega' ถ้าต้องการขนาดใหญ่ขึ้น
+        size: 'mega', // หรือ 'kilo'(ขนาดเล็ก),'mega' ถ้าต้องการขนาดใหญ่ขึ้น
         body: {
             type: 'box',
             layout: 'vertical',
